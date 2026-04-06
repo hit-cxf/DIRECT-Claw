@@ -1,0 +1,37 @@
+[project]
+name = "direct-mashup"
+version = "0.1.0"
+description = "DIRECT framework for video mashup creation."
+requires-python = ">=3.12"
+dependencies = [
+    "torch==2.6.0",
+    "torchvision==0.21.0",
+    "torchaudio==2.6.0",
+
+    "openai==2.9.0",               
+    "pydantic==2.12.5",         
+    
+    "open_clip_torch==3.2.0",    
+    "opencv-python-headless==4.13.0.92",
+    "scenedetect==0.6.7.1",    
+    "imageio-ffmpeg==0.6.0",       
+    "einops==0.8.1",
+
+    "librosa==0.11.0",        
+    "demucs==4.0.1",      
+    "madmom @ git+https://github.com/CPJKU/madmom.git",   
+    "natten==0.17.5+torch260cu124",      
+    "allin1 @ git+https://github.com/govi218/all-in-one.git@gov/update-deprecated",
+
+    "numpy==2.3.0",
+    "pandas==2.3.3",
+    "scipy==1.16.3",
+    "PyYAML==6.0.3",         
+    "tqdm==4.67.1",
+    "loguru==0.7.3",   
+    "umap-learn==0.5.11",
+]
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"

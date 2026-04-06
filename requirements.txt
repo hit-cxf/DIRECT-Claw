@@ -1,0 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cu124
+--trusted-host shi-labs.com
+--find-links http://shi-labs.com/natten/wheels/cu124
+-e .

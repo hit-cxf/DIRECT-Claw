@@ -1,0 +1,8 @@
+disable_planner: false
+disable_director: false
+max_validation_attempts: 2
+editor_params:
+  beam_size: 10
+  exploration: 5
+  ret_num: 3
+  pool_size: 200

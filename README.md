@@ -13,7 +13,7 @@
 
 <div align="center">
 
-[![arXiv](https://img.shields.io/badge/arXiv-2604.xxxxx-b31b1b.svg)](https://arxiv.org/abs/xxxx.xxxxx)
+[![arXiv](https://img.shields.io/badge/arXiv-2604.04875-b31b1b.svg)](https://arxiv.org/abs/2604.04875)
 [![Github Repo](https://img.shields.io/badge/GitHub-Repo-blue?style=flat&logo=GitHub)](https://github.com/AK-DREAM/DIRECT-Claw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -21,18 +21,38 @@
 
 ## 🎬 Showcases
 ### Generated Video Clips (Seamless Visual Transitions🪄)
-<div align="center">
-  <img src="assets/showcase1.gif" width="30%" alt="Showcase 1" />
-  <img src="assets/showcase2.gif" width="30%" alt="Showcase 2" />
-  <img src="assets/showcase3.gif" width="30%" alt="Showcase 3" />
-</div>
+<table width="100%">
+<tr>
+  <td align="center" width="33%">
+  <img src="assets/showcase1.gif" width="100%" alt="Showcase 1" />
+  </td>
+
+  <td align="center" width="33%">
+  <img src="assets/showcase2.gif" width="100%" alt="Showcase 2" />
+  </td>
+
+  <td align="center" width="33%">
+  <img src="assets/showcase3.gif" width="100%" alt="Showcase 3" />
+  </td>
+</tr>
+</table>
 
 ### Full-length Demo Videos (With Music🎵)
-<video src="https://github.com/user-attachments/assets/7b80aad5-b1ab-4511-aaba-5e429432814f" width="100%" controls ></video>
+<table width="100%">
+<tr>
+  <td align="center" width="33%">
+  <video src="https://github.com/user-attachments/assets/7b80aad5-b1ab-4511-aaba-5e429432814f" width="100%" controls ></video>
+  </td>
 
-<video src="https://github.com/user-attachments/assets/063bed64-782b-41de-81fe-496ea08b67f5" width="100%" controls ></video>
+  <td align="center" width="33%">
+  <video src="https://github.com/user-attachments/assets/063bed64-782b-41de-81fe-496ea08b67f5" width="100%" controls ></video>
+  </td>
 
-<video src="https://github.com/user-attachments/assets/8f81ad74-86f7-4965-a1eb-5b85580dd454" width="100%" controls ></video>
+  <td align="center" width="33%">
+  <video src="https://github.com/user-attachments/assets/8f81ad74-86f7-4965-a1eb-5b85580dd454" width="100%" controls ></video>
+  </td>
+</tr>
+</table>
 
 ## 🔥 Key Features
 - **Hierarchical Multi-Agent Collaboration**: A three-tier architecture (Screenwriter, Director, Editor) that bridges high-level editing intents with frame-level editing precision.
@@ -130,4 +150,11 @@ We would like to express our gratitude to the researchers and developers of the 
 We also thank the developers of **[Qwen3-VL](https://github.com/QwenLM/Qwen3-VL)** and the **[vLLM](https://github.com/vllm-project/vllm)** framework for providing the high-performance MLLM backend that powers our hierarchical agents.
 
 ## 📝 Citation
-The paper is currently in preparation. The arXiv link and formal BibTeX citation will be updated here shortly.
+```bibtex
+@article{li2026direct,
+  title={DIRECT: Video Mashup Creation via Hierarchical Multi-Agent Planning and Intent-Guided Editing}, 
+  author={Li, Ke and Li, Maoliang and Chen, Jialiang and Chen, Jiayu and Zheng, Zihao and Wang, Shaoqi and Chen, Xiang},
+  journal={arXiv preprint arXiv:2604.04875},
+  year={2026}
+}
+```

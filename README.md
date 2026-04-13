@@ -80,6 +80,8 @@ Visualization of the hierarchical planning workflow. The Screenwriter leverages 
 
 Intent-Guided Shot Sequence Editing. The Editor leverages a tailored beam search algorithm with frame-level dynamic sliding-window trimming to find optimal shot sequences that satisfies both visual continuity and auditory alignment. The validator then detects editing failures caused by rigid constraints and prompts query adjustment to ensure sequence coherence.
 
+For more details, please refer to our [arXiv preprint](https://arxiv.org/abs/2604.04875).
+
 ## 🚀 Quick Start
 
 ### 1. Environment Setup
@@ -125,11 +127,10 @@ Note: filepath must be a relative path rooted at the `data/` directory.
 ```bash
 python -m src.main_preprocess --csv path/to/your/source_videos.csv
 ```
-**Step 2**: Task Configuration
-Create a `task.yaml` to configurate your generation task:
+**Step 2**: Create a `task.yaml` to configurate your generation task:
 ```yaml
 video_csv: "path/to/your/source_videos.csv"    # Relative to data/
-video_fps: 24                                  # Please make sure all source videos have identical frames-per-second!
+video_fps: 24                                  # Please make sure all source videos have identical fps (frames-per-second)!
 music_path: "music_tracks/bgm.mp3"             # Relative to data/
 user_prompt: "A high-octane movie montage with fast transitions"
 ```
@@ -150,6 +151,7 @@ We would like to express our gratitude to the researchers and developers of the 
 We also thank the developers of **[Qwen3-VL](https://github.com/QwenLM/Qwen3-VL)** and the **[vLLM](https://github.com/vllm-project/vllm)** framework for providing the high-performance MLLM backend that powers our hierarchical agents.
 
 ## 📝 Citation
+If you find our work helpful, please consider citing:
 ```bibtex
 @article{li2026direct,
   title={DIRECT: Video Mashup Creation via Hierarchical Multi-Agent Planning and Intent-Guided Editing}, 

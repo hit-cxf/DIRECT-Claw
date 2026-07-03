@@ -1,3 +1,0 @@
-openai_api_key: "empty"
-openai_base_url: "http://localhost:8080/v1"
-llm_model_name: "Qwen/Qwen3-VL-8B-Instruct"

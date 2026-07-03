@@ -19,3 +19,6 @@ benchmark
 
 # use api to call aliyun's model: qwen3.7-plus
 configs/agent.yaml
+
+# ignore model cache
+model_cache/

@@ -16,3 +16,6 @@ benchmark
 *.log
 *.pkl
 *.pyc
+
+# use api to call aliyun's model: qwen3.7-plus
+configs/agent.yaml

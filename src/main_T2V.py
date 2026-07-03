@@ -227,9 +227,11 @@ def main_T2V() -> None:
             "ffmpeg", "-y",
             "-i", str(tmp_video),
             "-i", str(get_data_dir() / music_path),
-            "-c:v", "copy",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
             "-c:a", "aac",
-            "-strict", "experimental",
+            "-b:a", "192k",
             "-shortest",
             str(result_path),
         ]

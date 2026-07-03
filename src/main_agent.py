@@ -237,9 +237,17 @@ def main_agent() -> None:
             beats_remaining -= sum(pacing_control)
 
     result.generate_video(video_paths, Path("tmp.mp4"), fps=video_fps)
-    # Add music
+    # Add music and transcode OpenCV mp4v output to broadly compatible H.264/AAC.
     command = [
-        "ffmpeg", "-y", "-i", "tmp.mp4", "-i", str(get_data_dir() / music_path), "-c:v", "copy", "-c:a", "aac", "-strict", "experimental", args.result_path
+        "ffmpeg", "-y",
+        "-i", "tmp.mp4",
+        "-i", str(get_data_dir() / music_path),
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        args.result_path,
     ]
 
     subprocess.run(command, check=True)

@@ -1,97 +1,129 @@
+from __future__ import annotations
+
+from http import HTTPStatus
+from typing import Any, Optional
+
+import dashscope
+from dashscope import MultiModalConversation
+
 from ..utils.path import get_config
-from typing import Optional
-from openai import OpenAI
+
 
 config = get_config("agent.yaml")
-
-client = OpenAI(
-    api_key=config.get("openai_api_key"),
-    base_url=config.get("openai_base_url")
-)
-
+api_key: str = config.get("openai_api_key", "")
+base_url: str = str(config.get("openai_base_url", "")).rstrip("/")
 model_name: str = config.get("llm_model_name", "")
 
-class Message:
-    """Represents a message for interacting with the LLM.
 
-    Attributes:
-        role (str): The role of the message (e.g., "user", "assistant", "system").
-        content (str): The content of the message.
-    """
+def _dashscope_base_url() -> str:
+    if base_url.endswith("/compatible-mode/v1"):
+        return base_url[: -len("/compatible-mode/v1")] + "/api/v1"
+    return base_url
+
+
+class Message:
+    """Represents a message for interacting with the LLM."""
 
     def __init__(self, role: str, content: Optional[str] = None):
         self.role = role
-        self.content: list[dict] = []
+        self.content: list[dict[str, Any]] = []
         if content:
             self.add_text(content)
-    def add_text(self, text: str):
-        """Add text content to the message.
 
-        Args:
-            text (str): The text content.
-        """
+    def add_text(self, text: str):
         self.content.append({
             "type": "text",
-            "text": text
+            "text": text,
         })
         return self
+
     def add_image(self, image_path: str):
-        """Add image content to the message.
-
-        Args:
-            image_path (str): The image file path.
-        """
         self.content.append({
             "type": "image_url",
-            "image_url": {"url": image_path},}
-        )
+            "image_url": {"url": image_path},
+        })
         return self
+
     def add_image_base64(self, image_base64: str):
-        """Add Base64 encoded image content to the message.
-
-        Args:
-            image_base64 (str): The Base64 encoded string of the image.
-        """
         self.content.append({
             "type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{image_base64}"},}
-        )
+            "image_url": {"url": f"data:image/png;base64,{image_base64}"},
+        })
         return self
-    def add_video(self, video_path: str, fps: int=2):
-        """Add video content to the message.
 
-        Args:
-            video_path (str): The video file path.
-        """
+    def add_video(self, video_path: str, fps: int = 2):
         self.content.append({
             "type": "video_url",
             "video_url": {"url": video_path},
-            "fps": fps
+            "fps": fps,
         })
         return self
-    
-    def to_dict(self) -> dict:
-        """Convert the message to a dictionary format.
 
-        Returns:
-            dict: A dictionary containing the role and content.
-        """
+    def to_dict(self) -> dict[str, Any]:
         return {"role": self.role, "content": self.content}
 
-def chat_with_llm(messages) -> str:
-    """Chat with the LLM.
 
-    Args:
-        messages (list): The list of messages.
-        verbose (bool): Whether to print detailed information in real-time.
-    Returns:
-        str: The response content from the LLM.
-    """
-    chat_response = client.chat.completions.create(
+def _content_to_dashscope(content: Any) -> list[dict[str, Any]] | str:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return str(content)
+
+    converted: list[dict[str, Any]] = []
+    for item in content:
+        if not isinstance(item, dict):
+            converted.append({"text": str(item)})
+            continue
+
+        item_type = item.get("type")
+        if item_type == "text":
+            converted.append({"text": str(item.get("text", ""))})
+        elif item_type == "image_url":
+            image_url = item.get("image_url") or {}
+            converted.append({"image": image_url.get("url")})
+        elif item_type == "video_url":
+            video_url = item.get("video_url") or {}
+            payload: dict[str, Any] = {"video": video_url.get("url")}
+            if item.get("fps") is not None:
+                payload["fps"] = item.get("fps")
+            if item.get("max_frames") is not None:
+                payload["max_frames"] = item.get("max_frames")
+            converted.append(payload)
+        elif "text" in item or "image" in item or "video" in item:
+            converted.append(item)
+        else:
+            converted.append({"text": str(item)})
+    return converted
+
+
+def _messages_to_dashscope(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "role": message.get("role", "user"),
+            "content": _content_to_dashscope(message.get("content", "")),
+        }
+        for message in messages
+    ]
+
+
+def _extract_text(response: Any) -> str:
+    content = response.output.choices[0].message.content
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        texts = [str(item.get("text", "")) for item in content if isinstance(item, dict) and item.get("text")]
+        return "\n".join(texts).strip()
+    return str(content).strip()
+
+
+def chat_with_llm(messages: list[dict[str, Any]]) -> str:
+    """Chat with the LLM using DashScope native multimodal upload support."""
+    dashscope.base_http_api_url = _dashscope_base_url()
+    response = MultiModalConversation.call(
+        api_key=api_key,
         model=model_name,
-        messages=messages,
+        messages=_messages_to_dashscope(messages),
     )
-    result = chat_response.choices[0].message
-    # if hasattr(result, "reasoning_content"):
-    #     print(f"LLM reasoning content: {result.reasoning_content}")
-    return result.content.strip() if result.content else ""
+    if response.status_code != HTTPStatus.OK:
+        raise RuntimeError(f"DashScope {response.status_code} {response.code}: {response.message}")
+    return _extract_text(response)

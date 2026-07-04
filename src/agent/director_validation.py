@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 import logging
 import re
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
+from urllib.parse import urlparse, unquote
 
 from .interaction_utils import SegmentGuidance, prompt_manager
 from .editing_utils import Score
@@ -32,6 +35,52 @@ class ValidationResult:
     suggestions: list[str]
     best_candidate: int | None
     raw_response: str
+
+
+MIN_DASHSCOPE_VIDEO_SECONDS = 2.0
+
+
+def _candidate_local_path(video_path: str) -> Path | None:
+    parsed = urlparse(video_path)
+    if parsed.scheme == "file":
+        return Path(unquote(parsed.path))
+    if not parsed.scheme:
+        return Path(video_path)
+    return None
+
+
+def _video_duration_seconds(video_path: str) -> float | None:
+    local_path = _candidate_local_path(video_path)
+    if local_path is None or not local_path.exists():
+        return None
+    try:
+        out = subprocess.check_output(
+            [
+                "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1", str(local_path),
+            ],
+            text=True,
+        ).strip()
+        return float(out)
+    except Exception as exc:
+        logger.debug("Unable to probe candidate duration for %s: %s", video_path, exc)
+        return None
+
+
+def _top_candidate_fallback(reason: str) -> ValidationResult:
+    logger.warning("Skipping LLM validation: %s", reason)
+    return ValidationResult(
+        is_success=True,
+        verdict=reason,
+        issues=[reason],
+        suggestions=[],
+        best_candidate=0,
+        raw_response=json.dumps({
+            "success": True,
+            "best_candidate": 0,
+            "verdict": reason,
+        }),
+    )
 
 
 def _build_validation_prompt(guidance: SegmentGuidance, candidates: list[BeamCandidate]) -> str:
@@ -99,15 +148,36 @@ def validate_edit(
     logger.debug("Validation prompt prepared for LLM (beam mode).")
 
     messages = [Message(role="user").add_text(prompt_text).to_dict()]
+    video_messages_added = 0
     for idx, cand in enumerate(candidates):
+        duration = _video_duration_seconds(cand.video_path)
+        if duration is not None and duration < MIN_DASHSCOPE_VIDEO_SECONDS:
+            logger.warning(
+                "Skipping Candidate %s video validation because it is too short for DashScope: %.3fs < %.3fs (%s)",
+                idx, duration, MIN_DASHSCOPE_VIDEO_SECONDS, cand.video_path,
+            )
+            continue
         messages.append(
             Message(role="user")
             .add_text(f"Candidate {idx} video")
             .add_video(cand.video_path, fps=fps)
             .to_dict()
         )
+        video_messages_added += 1
 
-    response = chat_with_llm(messages)
+    if video_messages_added == 0:
+        return _top_candidate_fallback(
+            "all beam candidate videos are shorter than DashScope video minimum; selected top-scoring candidate"
+        )
+
+    try:
+        response = chat_with_llm(messages)
+    except RuntimeError as exc:
+        if "video file is too short" in str(exc):
+            return _top_candidate_fallback(
+                "DashScope rejected a validation video as too short; selected top-scoring candidate"
+            )
+        raise
 
     parsed = _parse_json_response(response)
 

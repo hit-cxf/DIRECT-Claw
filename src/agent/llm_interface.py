@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from http import HTTPStatus
 from typing import Any, Optional
 
@@ -119,11 +120,32 @@ def _extract_text(response: Any) -> str:
 def chat_with_llm(messages: list[dict[str, Any]]) -> str:
     """Chat with the LLM using DashScope native multimodal upload support."""
     dashscope.base_http_api_url = _dashscope_base_url()
-    response = MultiModalConversation.call(
-        api_key=api_key,
-        model=model_name,
-        messages=_messages_to_dashscope(messages),
-    )
-    if response.status_code != HTTPStatus.OK:
-        raise RuntimeError(f"DashScope {response.status_code} {response.code}: {response.message}")
-    return _extract_text(response)
+    retryable_status = {
+        HTTPStatus.REQUEST_TIMEOUT,
+        HTTPStatus.CONFLICT,
+        HTTPStatus.TOO_MANY_REQUESTS,
+        HTTPStatus.INTERNAL_SERVER_ERROR,
+        HTTPStatus.BAD_GATEWAY,
+        HTTPStatus.SERVICE_UNAVAILABLE,
+        HTTPStatus.GATEWAY_TIMEOUT,
+    }
+    converted_messages = _messages_to_dashscope(messages)
+    last_error: RuntimeError | None = None
+    for attempt in range(1, 6):
+        response = MultiModalConversation.call(
+            api_key=api_key,
+            model=model_name,
+            messages=converted_messages,
+        )
+        if response.status_code == HTTPStatus.OK:
+            return _extract_text(response)
+
+        last_error = RuntimeError(f"DashScope {response.status_code} {response.code}: {response.message}")
+        if response.status_code not in retryable_status or attempt == 5:
+            raise last_error
+        sleep_sec = min(60, 5 * attempt)
+        print(f"[llm_interface] {last_error}; retrying in {sleep_sec}s ({attempt}/5)", flush=True)
+        time.sleep(sleep_sec)
+
+    assert last_error is not None
+    raise last_error

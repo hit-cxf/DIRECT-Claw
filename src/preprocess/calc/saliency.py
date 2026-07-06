@@ -38,6 +38,20 @@ class U2Net_Dataset(Dataset):
         frame = u2nettransform(self.decoder[frame_idx])  
         return idx, frame
 
+class U2Net_CachedDataset(Dataset):
+    def __init__(self, frame_cache):
+        self.frame_cache = frame_cache
+        self.global_indices = frame_cache.primary_global_indices
+
+    def __len__(self):
+        return len(self.global_indices)
+
+    def __getitem__(self, idx):
+        global_idx = self.global_indices[idx]
+        frame = u2nettransform(self.frame_cache.get(global_idx))
+        return global_idx, frame
+
+
 class U2Net_IterableDataset(IterableDataset):
     def __init__(self, video_path: str, keyframe_indices: list[int]):
         self.video_path = video_path
@@ -69,13 +83,18 @@ class U2Net_IterableDataset(IterableDataset):
             frame = u2nettransform(frame) 
             yield idx, frame
 
-def calc_saliency(video_path, num_frames, features: VideoFeatures, device="cuda:0"):
+def calc_saliency(video_path, num_frames, features: VideoFeatures, device="cuda:0", frame_cache=None):
     keyframe_indices = list(range(0, num_frames, features.keyframe_interval))
-    total_tasks = len(keyframe_indices)
     batch_size = 32
 
-    dataset = U2Net_IterableDataset(video_path, keyframe_indices)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    if frame_cache is not None:
+        dataset = U2Net_CachedDataset(frame_cache)
+        total_tasks = len(dataset)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+    else:
+        total_tasks = len(keyframe_indices)
+        dataset = U2Net_IterableDataset(video_path, keyframe_indices)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
     U2NET = importlib.import_module("U-2-Net.model").U2NET
     net = U2NET(3, 1)

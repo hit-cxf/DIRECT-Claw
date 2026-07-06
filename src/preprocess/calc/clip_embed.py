@@ -31,6 +31,20 @@ class CLIP_Dataset(Dataset):
         frame = cliptransform(self.decoder[frame_idx])      
         return idx, frame
     
+class CLIP_CachedDataset(Dataset):
+    def __init__(self, frame_cache):
+        self.frame_cache = frame_cache
+        self.global_indices = frame_cache.primary_global_indices
+
+    def __len__(self):
+        return len(self.global_indices)
+
+    def __getitem__(self, idx):
+        global_idx = self.global_indices[idx]
+        frame = cliptransform(self.frame_cache.get(global_idx))
+        return global_idx, frame
+
+
 class CLIP_IterableDataset(IterableDataset):
     def __init__(self, video_path: str, keyframe_indices: list[int]):
         self.video_path = video_path
@@ -62,7 +76,7 @@ class CLIP_IterableDataset(IterableDataset):
             frame = cliptransform(frame) 
             yield idx, frame
 
-def calc_clip_embedding(video_path, num_frames, features: VideoFeatures, device = "cuda:0"):
+def calc_clip_embedding(video_path, num_frames, features: VideoFeatures, device = "cuda:0", frame_cache=None):
     model_name = "ViT-B-32"
     model, _, _ = open_clip.create_model_and_transforms(
         model_name,
@@ -72,11 +86,16 @@ def calc_clip_embedding(video_path, num_frames, features: VideoFeatures, device 
     model.eval()
 
     keyframe_indices = list(range(0, num_frames, features.keyframe_interval))
-    total_tasks = len(keyframe_indices)
     batch_size = 32
 
-    dataset = CLIP_IterableDataset(video_path, keyframe_indices)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    if frame_cache is not None:
+        dataset = CLIP_CachedDataset(frame_cache)
+        total_tasks = len(dataset)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+    else:
+        total_tasks = len(keyframe_indices)
+        dataset = CLIP_IterableDataset(video_path, keyframe_indices)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
     for indices, frames in tqdm(dataloader, total=math.ceil(total_tasks/batch_size)):
         with torch.no_grad():

@@ -13,17 +13,49 @@ class MusicResult(allin1.typings.AnalysisResult):
         assert self.path is not None, "AnalysisResult must have a valid path."
         assert self.path.is_file(), f"Audio file does not exist: {self.path}"
         self.y, self.sr = librosa.load(self.path, sr=None)
-        
-        if (len(self.y) / self.sr) - self.beats[-1] < 0.2:
-            del self.beats[-1]  # Remove the last beat as it is too close to the end of the music
-        self.beats.append(len(self.y) / self.sr)
+        duration = len(self.y) / self.sr if self.sr else 0.0
 
-        # Remove segments that do not contain any beats
+        beats = [float(b) for b in (self.beats or []) if 0.0 <= float(b) <= duration]
+        beat_positions = list(self.beat_positions or [])
+        if len(beat_positions) != len(beats):
+            beat_positions = [((i % 4) + 1) for i in range(len(beats))]
+
+        if not beats and duration > 0:
+            tempo, beat_frames = librosa.beat.beat_track(y=self.y, sr=self.sr, units="frames")
+            beat_times = librosa.frames_to_time(beat_frames, sr=self.sr)
+            beats = [float(b) for b in beat_times if 0.0 <= float(b) <= duration]
+            beat_positions = [((i % 4) + 1) for i in range(len(beats))]
+            if beats:
+                self.bpm = int(float(np.asarray(tempo).reshape(-1)[0])) if np.size(tempo) else int(self.bpm or 120)
+
+        if not beats and duration > 0:
+            # Ambient / documentary tracks can have no reliable beat detections.
+            # Fall back to a gentle 120 BPM grid so DIRECT can still construct
+            # a timeline instead of crashing on an empty beat list.
+            beats = list(np.arange(0.0, duration, 0.5, dtype=float))
+            beat_positions = [((i % 4) + 1) for i in range(len(beats))]
+            self.bpm = int(self.bpm or 120)
+
+        if beats and duration - beats[-1] < 0.2:
+            beats = beats[:-1]
+            beat_positions = beat_positions[:len(beats)]
+        if duration > 0:
+            beats.append(float(duration))
+            beat_positions.append(((len(beat_positions) % 4) + 1))
+
+        self.beats = beats
+        self.beat_positions = beat_positions
+
+        if not self.segments:
+            self.segments = [allin1.typings.Segment(start=0.0, end=float(duration), label="section")]
+
+        # Remove segments that do not contain any beats, but keep a whole-track
+        # segment as a final fallback for beatless or very sparse music.
         beat_set = set(self.beats)
         self.segments = [
             seg for seg in self.segments
             if any(seg.start <= b < seg.end for b in beat_set)
-        ]
+        ] or [allin1.typings.Segment(start=0.0, end=float(duration), label="section")]
         
     
     def get_rms(self, start_time: float, end_time: float) -> float:
@@ -111,8 +143,11 @@ def analyze_music(music_path: Path | str, is_absolute: bool = False) -> MusicRes
 
 def get_music_info(music_prof: MusicResult) -> str:
     beats = list(zip(music_prof.beats, music_prof.beat_positions))
-    # Note: Identifying the time signature/meter (e.g., 4/4) 
-    beat_count = sorted(music_prof.beat_positions)[int(0.95 * len(music_prof.beat_positions))]
+    # Note: Identifying the time signature/meter (e.g., 4/4)
+    if music_prof.beat_positions:
+        beat_count = sorted(music_prof.beat_positions)[int(0.95 * (len(music_prof.beat_positions) - 1))]
+    else:
+        beat_count = 4
     sections = [
         (section, [(beat, position) for beat, position in beats if section.start <= beat < section.end])
         for section in music_prof.segments

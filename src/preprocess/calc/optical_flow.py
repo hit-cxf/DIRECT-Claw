@@ -33,6 +33,21 @@ class RAFT_Dataset(Dataset):
 
         return idx, img1, img2
 
+class RAFT_CachedDataset(Dataset):
+    def __init__(self, frame_cache):
+        self.frame_cache = frame_cache
+        self.global_indices = [idx for idx in frame_cache.primary_global_indices if idx > 0]
+
+    def __len__(self):
+        return len(self.global_indices)
+
+    def __getitem__(self, idx):
+        flow_idx = self.global_indices[idx]
+        img1 = rafttransform(self.frame_cache.get(flow_idx - 1))
+        img2 = rafttransform(self.frame_cache.get(flow_idx))
+        return flow_idx, img1, img2
+
+
 class RAFT_IterableDataset(IterableDataset):
     def __init__(self, video_path: str, keyframe_indices: list[int]):
         self.video_path = video_path
@@ -68,13 +83,18 @@ class RAFT_IterableDataset(IterableDataset):
             last_frame = img2
             yield idx, img1, img2
 
-def calc_optical_flow(video_path, num_frames, features: VideoFeatures, device="cuda:0"):
+def calc_optical_flow(video_path, num_frames, features: VideoFeatures, device="cuda:0", frame_cache=None):
     keyframe_indices = list(range(0, num_frames, features.keyframe_interval))
-    total_tasks = len(keyframe_indices) - 1
     batch_size = 32
 
-    dataset = RAFT_IterableDataset(video_path, keyframe_indices)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    if frame_cache is not None:
+        dataset = RAFT_CachedDataset(frame_cache)
+        total_tasks = len(dataset)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+    else:
+        total_tasks = len(keyframe_indices) - 1
+        dataset = RAFT_IterableDataset(video_path, keyframe_indices)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
     weights = Raft_Large_Weights.DEFAULT
     raft_weight_transforms = weights.transforms()

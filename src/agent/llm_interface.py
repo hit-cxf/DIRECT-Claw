@@ -8,6 +8,7 @@ import dashscope
 from dashscope import MultiModalConversation
 
 from ..utils.path import get_config
+from .model_usage import ModelUsageLog
 
 
 config = get_config("agent.yaml")
@@ -131,12 +132,20 @@ def chat_with_llm(messages: list[dict[str, Any]]) -> str:
     }
     converted_messages = _messages_to_dashscope(messages)
     last_error: RuntimeError | None = None
+    usage_log = ModelUsageLog(model_name)
     for attempt in range(1, 6):
-        response = MultiModalConversation.call(
-            api_key=api_key,
-            model=model_name,
-            messages=converted_messages,
-        )
+        usage_log.write(attempt, "started")
+        try:
+            response = MultiModalConversation.call(
+                api_key=api_key,
+                model=model_name,
+                messages=converted_messages,
+            )
+        except Exception as exc:
+            usage_log.write(attempt, "failed", error=exc)
+            raise
+        event = "succeeded" if response.status_code == HTTPStatus.OK else "failed"
+        usage_log.write(attempt, event, response=response)
         if response.status_code == HTTPStatus.OK:
             return _extract_text(response)
 
